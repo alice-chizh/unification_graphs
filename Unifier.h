@@ -25,6 +25,7 @@ public:
 private:
     std::deque<Equation> equations; //очередь текущих уравнений
     Substitution substitution; //замена
+    bool equalTerms(const std::shared_ptr<Term>& left, const std::shared_ptr<Term>& right); //сравнение термов
     bool occurs(const std::string& variable, std::shared_ptr<Term> term); //встречается ли переменная внутри терма
     std::shared_ptr<Term> substitute(std::shared_ptr<Term> term); //применяем найденную подстановку к терму
 };

@@ -13,8 +13,8 @@ bool Unifier::unify(std::shared_ptr<Term> left, std::shared_ptr<Term> right) {
         auto r = substitute(equation.right);
 
         // DELETE t = t
-        if (l->toString() == r->toString()) {
-            continue; //переходим к след ур
+        if (equalTerms(l, r)) {
+            continue;
         }
 
         // ORIENT t = X  ->  X = t
@@ -63,7 +63,7 @@ const Unifier::Substitution& Unifier::getSubstitution() const { //возвращ
     return substitution;
 }
 
-bool Unifier::occurs(const std::string& variable, std::shared_ptr<Term> term) { ё
+bool Unifier::occurs(const std::string& variable, std::shared_ptr<Term> term) {
     if (term->isVariable()) {
         return term->name == variable;
     }
@@ -88,4 +88,30 @@ std::shared_ptr<Term> Unifier::substitute(std::shared_ptr<Term> term) {
         newArguments.push_back(substitute(argument));
     }
     return Term::Fun(term->name,newArguments);
+}
+
+bool Unifier::equalTerms(const std::shared_ptr<Term>& left, const std::shared_ptr<Term>& right) {
+    // Если один из них variable, а другой function, то деревья разные
+    if (left->type != right->type) {
+        return false;
+    }
+    // Если это переменные, то сравниваем их имена
+    if (left->isVariable()) {
+        return left->name == right->name;
+    }
+    // Если это функции, то сначала сравниваем имя функции
+    if (left->name != right->name) {
+        return false;
+    }
+    // Затем количество детей
+    if (left->args.size() != right->args.size()) {
+        return false;
+    }
+    // И рекурсивно сравниваем детей
+    for (size_t i = 0; i < left->args.size(); ++i) {
+        if (!equalTerms(left->args[i], right->args[i])) {
+            return false;
+        }
+    }
+    return true;
 }
