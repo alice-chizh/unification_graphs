@@ -8,4 +8,6 @@ add_executable(generalization_of_graph_unification main.cpp
         Term.h
         Unifier.cpp
         Unifier.h
+        Parser.cpp
+        Bisimulation.cpp
 )

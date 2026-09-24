@@ -1,4 +1,4 @@
-#include "Term.h"
+/*#include "Term.h"
 #include "Unifier.h"
 #include <iostream>
 #include <string>
@@ -39,7 +39,7 @@ void test(const std::string& name, std::shared_ptr<Term> left, std::shared_ptr<T
         auto left = Term::Fun("f", {X, gY});
         auto right = Term::Fun("f", {a, gb});
 
-        test("FULL EXAMPLE", left, right);*/
+        test("FULL EXAMPLE", left, right);
 
         auto X = Term::Var("X");
         auto a = Term::Fun("a");
@@ -50,3 +50,92 @@ void test(const std::string& name, std::shared_ptr<Term> left, std::shared_ptr<T
 
         test("REPEATED VARIABLE CLASH", left, right);
     }
+    */
+
+#include <fstream>
+#include <iostream>
+#include <string>
+
+#include "Parser.h"
+#include "Unifier.h"
+
+int main() {
+    std::ifstream input("tests.txt");
+    if (!input.is_open()) {
+        std::cerr << "Cannot open tests.txt\n";
+        return 1;
+    }
+
+    std::string line;
+    int testNumber = 1;
+
+    while (std::getline(input, line)) {
+        // Пропускаем пустые строки
+        if (line.empty()) {
+            continue;
+        }
+
+        try {
+            Parser parser(line);
+
+            Equation equation = parser.parseEquation();
+
+            Unifier unifier;
+
+            bool result = unifier.unify(
+                    equation.left,
+                    equation.right
+            );
+
+            std::cout
+                    << "Test "
+                    << testNumber
+                    << ": "
+                    << equation.left->toString()
+                    << " = "
+                    << equation.right->toString()
+                    << "\n";
+
+            if (result) {
+                std::cout << "  Result: SUCCESS\n";
+
+                const auto& substitution =
+                        unifier.getSubstitution();
+
+                if (!substitution.empty()) {
+                    std::cout << "  Substitution:\n";
+
+                    for (const auto& [variable, term]
+                            : substitution) {
+
+                        std::cout
+                                << "    "
+                                << variable
+                                << " -> "
+                                << term->toString()
+                                << "\n";
+                    }
+                }
+            } else {
+                std::cout << "  Result: FAILURE\n";
+            }
+
+            std::cout << "\n";
+
+        } catch (const std::exception& error) {
+            std::cerr
+                    << "Test "
+                    << testNumber
+                    << ": ERROR\n";
+
+            std::cerr
+                    << "  "
+                    << error.what()
+                    << "\n\n";
+        }
+
+        ++testNumber;
+    }
+
+    return 0;
+}

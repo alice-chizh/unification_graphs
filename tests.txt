@@ -1,0 +1,9 @@
+f(X,g(Y))=f(a,g(b))
+f(X,X)=f(a,a)
+f(X,X)=f(a,b)
+X=a
+X=f(X)
+f(a)=g(a)
+f(a)=f(a)
+f(X)=f(a)
+f(X,g(Y))=f(a,g(b))
