@@ -7,10 +7,10 @@
 #include <unordered_map>
 #include <vector>
 
-struct Equation {
+/*struct Equation {
     std::shared_ptr<Term> left;
     std::shared_ptr<Term> right;
-};
+};*/
 
 class Unifier {
 public:

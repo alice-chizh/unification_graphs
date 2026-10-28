@@ -4,10 +4,11 @@ project(generalization_of_graph_unification)
 set(CMAKE_CXX_STANDARD 17)
 
 add_executable(generalization_of_graph_unification main.cpp
+        main.cpp
         Term.cpp
-        Term.h
-        Unifier.cpp
-        Unifier.h
-        Parser.cpp
+        GraphParser.cpp
+        GraphUnifier.cpp
         Bisimulation.cpp
+        BisimulationMinimizer.cpp
+        Unifier.cpp
 )

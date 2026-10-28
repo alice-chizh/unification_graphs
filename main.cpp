@@ -1,141 +1,61 @@
-/*#include "Term.h"
-#include "Unifier.h"
-#include <iostream>
-#include <string>
-void test(const std::string& name, std::shared_ptr<Term> left, std::shared_ptr<Term> right) {
-        std::cout << "==============================\n";
-        std::cout << "TEST: " << name << "\n";
-        std::cout << "Equation:\n";
-        std::cout << left->toString() << " = " << right->toString() << "\n";
-        Unifier unifier;
-
-        bool success = unifier.unify(left, right);
-        if (!success) {
-            std::cout << "Result: NO UNIFIER\n";
-        } else {
-            std::cout << "Result: SUCCESS\n";
-            std::cout << "Substitution:\n";
-            for (const auto& [variable, term] : unifier.getSubstitution()) {
-                std::cout << "  " << variable << " -> " << term->toString() << "\n";
-            }
-        }
-        std::cout << "\n";
-    }
-    int main() {
-       /* auto X = Term::Var("X");
-        auto fX = Term::Fun("f", {X});
-        test("OCCURS-CHECK",X,fX);*/
-
-
-        /*auto X = Term::Var("X");
-        auto Y = Term::Var("Y");
-
-        auto a = Term::Fun("a");
-        auto b = Term::Fun("b");
-
-        auto gY = Term::Fun("g", {Y});
-        auto gb = Term::Fun("g", {b});
-
-        auto left = Term::Fun("f", {X, gY});
-        auto right = Term::Fun("f", {a, gb});
-
-        test("FULL EXAMPLE", left, right);
-
-        auto X = Term::Var("X");
-        auto a = Term::Fun("a");
-        auto b = Term::Fun("b");
-
-        auto left = Term::Fun("f", {X, X});
-        auto right = Term::Fun("f", {a, b});
-
-        test("REPEATED VARIABLE CLASH", left, right);
-    }
-    */
-
 #include <fstream>
 #include <iostream>
 #include <string>
+#include "Bisimulation.h"
+#include "GraphParser.h"
+#include "GraphUnifier.h"
 
-#include "Parser.h"
-#include "Unifier.h"
-
-int main() {
-    std::ifstream input("tests.txt");
+int main(int argc, char** argv) {
+    std::string fileName = argc > 1 ? argv[1] : "tests.txt";
+    std::ifstream input(fileName);
     if (!input.is_open()) {
-        std::cerr << "Cannot open tests.txt\n";
+        std::cerr << "Cannot open " << fileName << "\n";
         return 1;
     }
-
     std::string line;
     int testNumber = 1;
-
     while (std::getline(input, line)) {
-        // Пропускаем пустые строки
-        if (line.empty()) {
+        size_t first = line.find_first_not_of(" \t\r");
+        if (first == std::string::npos || line[first] == '#') {
             continue;
         }
-
+        std::cout << "Test " << testNumber++ << ": " << line << "\n";
         try {
-            Parser parser(line);
-
-            Equation equation = parser.parseEquation();
-
-            Unifier unifier;
-
-            bool result = unifier.unify(
-                    equation.left,
-                    equation.right
-            );
-
-            std::cout
-                    << "Test "
-                    << testNumber
-                    << ": "
-                    << equation.left->toString()
-                    << " = "
-                    << equation.right->toString()
-                    << "\n";
-
-            if (result) {
-                std::cout << "  Result: SUCCESS\n";
-
-                const auto& substitution =
-                        unifier.getSubstitution();
-
-                if (!substitution.empty()) {
-                    std::cout << "  Substitution:\n";
-
-                    for (const auto& [variable, term]
-                            : substitution) {
-
-                        std::cout
-                                << "    "
-                                << variable
-                                << " -> "
-                                << term->toString()
-                                << "\n";
-                    }
-                }
-            } else {
-                std::cout << "  Result: FAILURE\n";
+            GraphParser parser(line);
+            auto system = parser.parseSystem();
+            GraphUnifier unifier;
+            if (!unifier.unify(system)) {
+                std::cout << "  Result: FAILURE (" << unifier.getFailureReason() << ")\n\n";
+                continue;
             }
 
-            std::cout << "\n";
+            std::cout << "  Result: SUCCESS\n";
+            auto substitution = unifier.getSubstitution();
+            if (!substitution.empty()) {
+                std::cout << "  Substitution:\n";
+                for (const auto& [variable, value] : substitution) {
+                    std::cout << "    " << variable << " -> " << value->toString() << "\n";
+                }
+            }
+
+            auto unified = unifier.getUnifiedTerm();
+            std::cout << "  Unified graph: " << unified->toString() << "\n";
+            std::cout << "  Unfolding:     " << unified->unfold(4) << "\n";
+
+            // проверка: развёртки σ(l) и σ(r) совпадают <=> графы бисимилярны.
+            bool verified = true;
+            for (const auto& equation : system) {
+                Bisimulation bisimulation;
+                verified = verified && bisimulation.check(
+                        unifier.apply(equation.left),
+                        unifier.apply(equation.right));
+            }
+
+            std::cout << "  Check sigma(l) ~ sigma(r): " << (verified ? "OK" : "WRONG") << "\n\n";
 
         } catch (const std::exception& error) {
-            std::cerr
-                    << "Test "
-                    << testNumber
-                    << ": ERROR\n";
-
-            std::cerr
-                    << "  "
-                    << error.what()
-                    << "\n\n";
+            std::cout << "  ERROR: " << error.what() << "\n\n";
         }
-
-        ++testNumber;
     }
-
     return 0;
 }

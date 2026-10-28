@@ -18,6 +18,14 @@ struct Term {
     bool isVariable() const;
     bool isFunction() const;
     std::string toString() const;
+    std::string unfold(int depth) const; // первые depth уровней универсального накрывающего дерева (развёртки).
+    void validate() const; // переменные допускаются только в вершинах без исходящих дуг
+    static std::vector<std::shared_ptr<Term>> collectNodes(const std::shared_ptr<Term>& root); // все вершины, достижимые из root, каждая ровно один раз
+};
+
+struct Equation { // уравнение left = right
+    std::shared_ptr<Term> left;
+    std::shared_ptr<Term> right;
 };
 
 #endif

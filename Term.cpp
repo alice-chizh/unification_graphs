@@ -1,6 +1,7 @@
-//#include <iostream>
-#include <sstream>
 #include "Term.h"
+#include <stdexcept>
+#include <unordered_map>
+#include <unordered_set>
 
 std::shared_ptr<Term> Term::Var(const std::string& name){
     auto t = std::make_shared<Term>();
@@ -23,138 +24,110 @@ bool Term::isVariable() const {
 bool Term::isFunction() const {
     return type == TermType::FUNCTION;
 }
+namespace {
+
+// Если при обходе мы приходим в вершину, которая сейчас лежит на стеке
+// рекурсии, значит найдена обратная дуга (цикл): печатаем ссылку $k,
+// а при выходе из этой вершины добавляем к ней метку "$k:".
+    class CyclePrinter {
+    public:
+        std::string print(const Term* term) {
+            if (onStack.count(term)) {
+                referenced.insert(term);
+                return "$" + std::to_string(idOf(term));
+            }
+
+            if (term->args.empty()) {
+                return term->name;
+            }
+
+            onStack.insert(term);
+
+            std::string result = term->name + "(";
+
+            for (size_t i = 0; i < term->args.size(); ++i) {
+                if (i > 0) {
+                    result += ", ";
+                }
+                result += print(term->args[i].get());
+            }
+
+            result += ")";
+
+            onStack.erase(term);
+
+            if (referenced.erase(term)) {
+                result = "$" + std::to_string(idOf(term)) + ":" + result;
+            }
+
+            return result;
+        }
+
+    private:
+        std::unordered_map<const Term*, int> ids;
+        std::unordered_set<const Term*> onStack;
+        std::unordered_set<const Term*> referenced;
+
+        int idOf(const Term* term) {
+            auto [it, inserted] = ids.emplace(term, static_cast<int>(ids.size()) + 1);
+            return it->second;
+        }
+    };
+
+}
 
 std::string Term::toString() const {
-    if (isVariable()) {
-        return name; }
+    CyclePrinter printer;
+    return printer.print(this);
+}
+
+std::string Term::unfold(int depth) const {
     if (args.empty()) {
         return name; }
-    std::stringstream result;
-    result << name << "(";
+    if (depth == 0) {
+        return "..."; }
+    std::string result = name + "(";
     for (size_t i = 0; i < args.size(); ++i) {
         if (i > 0) {
-            result << ", ";
-        }
-        result << args[i]->toString();
+            result += ", "; }
+        result += args[i]->unfold(depth - 1);
     }
-    result << ")";
-    return result.str();
+    return result + ")";
 }
 
-
-
-
-
-/*
-struct Equation<Term>  {
-    shared_ptr<Term> left;
-    shared_ptr<Term> right;
-};
-
-deque<Equation> equations;
-equations.push_back({left, right});
-
-
-
-unordered_map<string, shared_ptr<Term>> substitution;
-
-bool occurs (const string& variable, const shared_ptr<Term>& term) {
-
-}
-
-
-bool occurs(
-        const string& variable,
-        const shared_ptr<Term>& term
-) {
-    if (term->type == Term::VARIABLE) {
-        return term->name == variable;
-    }
-
-    for (const auto& arg : term->args) {
-        if (occurs(variable, arg)) {
-            return true;
+std::vector<std::shared_ptr<Term>> Term::collectNodes(const std::shared_ptr<Term>& root) {
+    std::vector<std::shared_ptr<Term>> result;
+    std::unordered_set<const Term*> visited;
+    std::vector<std::shared_ptr<Term>> stack{root};
+    while (!stack.empty()) {
+        auto current = stack.back();
+        stack.pop_back();
+        if (!visited.insert(current.get()).second) {
+            continue; }
+        result.push_back(current);
+        for (const auto& child : current->args) {
+            stack.push_back(child);
         }
     }
-
-    return false;
+    return result;
 }
 
-
-
-
-
-
-
-
-
-
-bool unify(
-        deque<Equation>& equations,
-        unordered_map<string, shared_ptr<Term>>& substitution
-) {
-    while (!equations.empty()) {
-
-        Equation eq = equations.front();
-        equations.pop_front();
-
-        auto s = eq.left;
-        auto t = eq.right;
-
-        // DELETE
-        if (s == t) {
-            continue;
+void Term::validate() const {
+    std::unordered_set<const Term*> visited;
+    std::vector<const Term*> stack{this};
+    while (!stack.empty()) {
+        const Term* node = stack.back();
+        stack.pop_back();
+        if (!visited.insert(node).second) {
+            continue; }
+        if (node->isVariable() && !node->args.empty()) {
+            throw std::runtime_error("Variable " + node->name + " has outgoing edges");
         }
-
-        // Если переменная слева
-        if (s->type == Term::VARIABLE) {
-
-            const string& x = s->name;
-
-            // X = X
-            if (t->type == Term::VARIABLE &&
-                t->name == x) {
-                continue;
-            }
-
-            // OCCURS CHECK
-            if (occurs(x, t)) {
-                return false;
-            }
-
-            // ELIMINATE
-            substitution[x] = t;
-
-            // Заменяем X на t во всех оставшихся уравнениях
-            for (auto& e : equations) {
-                // здесь нужна applySubstitution
-            }
-
-            continue;
+        if (node->isFunction() && node->name.empty()) {
+            throw std::runtime_error("Function node without a label");
         }
-
-        // Если переменная справа:
-        // s = X превращаем в X = s
-        if (t->type == Term::VARIABLE) {
-            equations.push_back({t, s});
-            continue;
-        }
-
-        // CLASH
-        if (s->name != t->name ||
-            s->args.size() != t->args.size()) {
-            return false;
-        }
-
-        // DECOMPOSE
-        for (size_t i = 0; i < s->args.size(); ++i) {
-            equations.push_back({
-                                        s->args[i],
-                                        t->args[i]
-                                });
+        for (const auto& child : node->args) {
+            stack.push_back(child.get());
         }
     }
-
-    return true;
 }
-*/
